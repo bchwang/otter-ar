@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>분수대 수달 — 양지파인리조트</title>
+<style>
+  :root{
+    --ink:#0d1512;
+    --paper:#f2f5f1;
+    --water:#2f7f8f;
+    --reed:#5c8b4a;
+    --sun:#e8b44a;
+    --glass:rgba(10,20,17,.62);
+    --line:rgba(255,255,255,.16);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  #stage{position:fixed;inset:0}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+  canvas#ar{position:absolute;inset:0;width:100%;height:100%}
+
+  /* ---------- 시작 화면 ---------- */
+  #gate{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end;
+    padding:28px 22px calc(38px + env(safe-area-inset-bottom));
+    background:radial-gradient(120% 80% at 50% 12%,#17403f 0%,#0a1a1c 55%,#050b0c 100%)}
+  #gate .mark{position:absolute;top:calc(8vh + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:center}
+  #gate h1{font-size:30px;line-height:1.28;font-weight:800;letter-spacing:-.02em;margin:0 0 10px}
+  #gate p{margin:0 0 22px;font-size:15px;line-height:1.65;color:rgba(255,255,255,.72);max-width:30ch}
+  .btn{display:block;width:100%;border:0;border-radius:16px;padding:17px;font-size:17px;font-weight:700;
+    font-family:inherit;color:#04140f;background:var(--sun);cursor:pointer}
+  .btn.ghost{background:rgba(255,255,255,.1);color:#fff;border:1px solid var(--line)}
+  .btn+.btn{margin-top:10px}
+
+  /* ---------- HUD ---------- */
+  .hud{position:absolute;z-index:20;pointer-events:none}
+  #topbar{top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;display:flex;gap:8px;align-items:flex-start}
+  .chip{pointer-events:auto;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--line);border-radius:999px;padding:9px 14px;font-size:13px;font-weight:600;
+    display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .chip.tap{cursor:pointer}
+  .spacer{flex:1}
+  #msg{position:absolute;left:16px;right:16px;bottom:calc(126px + env(safe-area-inset-bottom));z-index:20;
+    text-align:center;font-size:15px;font-weight:600;line-height:1.5;text-shadow:0 2px 12px rgba(0,0,0,.8);
+    transition:opacity .3s;pointer-events:none}
+  #arrow{position:absolute;z-index:19;width:78px;height:78px;margin:-39px 0 0 -39px;opacity:0;transition:opacity .25s;
+    display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #arrow svg{filter:drop-shadow(0 3px 10px rgba(0,0,0,.6))}
+
+  #dock{position:absolute;z-index:20;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));
+    display:flex;align-items:center;justify-content:center;gap:26px}
+  .shutter{pointer-events:auto;width:76px;height:76px;border-radius:50%;border:4px solid rgba(255,255,255,.9);
+    background:rgba(255,255,255,.22);backdrop-filter:blur(8px);cursor:pointer;display:grid;place-items:center}
+  .shutter i{display:block;width:56px;height:56px;border-radius:50%;background:#fff}
+  .mini{pointer-events:auto;width:50px;height:50px;border-radius:50%;background:var(--glass);border:1px solid var(--line);
+    backdrop-filter:blur(14px);display:grid;place-items:center;cursor:pointer;font-size:19px}
+
+  /* ---------- 설정 시트 ---------- */
+  #sheet{position:fixed;z-index:50;inset:auto 0 0 0;max-height:88vh;overflow-y:auto;background:#0b1513;
+    border-top:1px solid var(--line);border-radius:22px 22px 0 0;transform:translateY(102%);transition:transform .32s cubic-bezier(.3,.8,.3,1);
+    padding:10px 18px calc(28px + env(safe-area-inset-bottom))}
+  #sheet.open{transform:translateY(0)}
+  .grip{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.28);margin:6px auto 14px}
+  .grp{border-top:1px solid rgba(255,255,255,.09);padding:16px 0}
+  .grp:first-of-type{border-top:0}
+  .grp h3{margin:0 0 4px;font-size:15px;font-weight:700}
+  .grp .hint{margin:0 0 12px;font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.55)}
+  .row{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .row label{flex:0 0 96px;font-size:13px;color:rgba(255,255,255,.72)}
+  input[type=text],input[type=number]{flex:1;min-width:0;background:rgba(255,255,255,.07);border:1px solid var(--line);
+    color:#fff;border-radius:11px;padding:11px 12px;font-size:15px;font-family:inherit}
+  input[type=range]{flex:1;accent-color:var(--sun)}
+  .val{flex:0 0 58px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;color:var(--sun);font-weight:700}
+  .sbtn{flex:1;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;
+    padding:12px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+  .sbtn.go{background:var(--reed);border-color:transparent}
+  .sbtn.warn{background:transparent;color:#ff8f8f;border-color:rgba(255,143,143,.35)}
+  .seg{display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:13px;padding:4px}
+  .seg button{flex:1;border:0;background:transparent;color:rgba(255,255,255,.6);font-family:inherit;font-size:13.5px;
+    font-weight:700;padding:10px;border-radius:10px;cursor:pointer}
+  .seg button.on{background:var(--water);color:#fff}
+  #dbg{font-size:12px;line-height:1.85;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.66);
+    background:rgba(255,255,255,.05);border-radius:12px;padding:12px 14px;white-space:pre-wrap}
+  .toast{position:fixed;left:50%;bottom:calc(120px + env(safe-area-inset-bottom));transform:translate(-50%,14px);
+    z-index:60;background:#fff;color:#0b1513;font-size:14px;font-weight:700;padding:12px 20px;border-radius:999px;
+    opacity:0;transition:all .28s;pointer-events:none}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;z-index:55;pointer-events:none}
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="ar"></canvas>
+
+  <div class="hud" id="topbar">
+    <div class="chip" id="cDist">거리 —</div>
+    <div class="chip" id="cHead">방위 —</div>
+    <div class="spacer"></div>
+    <div class="chip tap" id="cGear">설정</div>
+  </div>
+
+  <div id="arrow"><svg width="78" height="78" viewBox="0 0 78 78"><circle cx="39" cy="39" r="27" fill="rgba(10,20,17,.55)" stroke="rgba(255,255,255,.5)"/><path d="M39 23 L50 47 L39 41 L28 47 Z" fill="#e8b44a"/></svg></div>
+  <div id="msg"></div>
+
+  <div class="hud" id="dock">
+    <div class="mini" id="bSound">🔊</div>
+    <div class="shutter" id="bShot"><i></i></div>
+    <div class="mini" id="bAim">🎯</div>
+  </div>
+</div>
+
+<div id="gate">
+  <div class="mark">
+    <svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="56" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)"/>
+      <path d="M22 84 Q60 66 98 84" stroke="#2f7f8f" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M30 94 Q60 78 90 94" stroke="rgba(47,127,143,.45)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="60" cy="58" rx="19" ry="21" fill="#a3764e"/>
+      <circle cx="45" cy="42" r="7" fill="#8d6340"/><circle cx="75" cy="42" r="7" fill="#8d6340"/>
+      <ellipse cx="60" cy="66" rx="12" ry="9" fill="#efdcc0"/>
+      <circle cx="52" cy="55" r="3.6" fill="#22190f"/><circle cx="68" cy="55" r="3.6" fill="#22190f"/>
+      <path d="M55 66 Q60 70 65 66" stroke="#5c422a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="60" cy="62" rx="3.6" ry="2.6" fill="#3c2a1c"/>
+    </svg>
+  </div>
+  <h1>분수대에 수달이 삽니다</h1>
+  <p>분수대 쪽으로 휴대폰을 들면 수달이 물 밖으로 올라옵니다. 카메라·위치·나침반 권한이 필요합니다.</p>
+  <button class="btn" id="bStart">수달 찾기</button>
+  <button class="btn ghost" id="bSetup">먼저 분수대 위치부터 잡기</button>
+</div>
+
+<div id="sheet">
+  <div class="grip"></div>
+
+  <div class="grp">
+    <h3>수달이 나타나는 방식</h3>
+    <p class="hint">GPS 기준은 분수대를 중심으로 어느 방향에서 봐도 나타납니다. 방위 고정은 티박스처럼 자리가 정해진 곳에서 각도만으로 띄웁니다.</p>
+    <div class="seg" id="segMode">
+      <button data-m="gps" class="on">GPS 기준</button>
+      <button data-m="bearing">방위 고정</button>
+    </div>
+  </div>
+
+  <div class="grp" id="gGps">
+    <h3>분수대 좌표</h3>
+    <p class="hint">분수대 바로 앞에 서서 아래 버튼을 누르면 그 자리가 분수대로 저장됩니다. 지도에서 찍은 값을 직접 넣어도 됩니다.</p>
+    <div class="row"><label>위도</label><input type="text" id="iLat" inputmode="decimal" placeholder="37.2xxxxx"></div>
+    <div class="row"><label>경도</label><input type="text" id="iLng" inputmode="decimal" placeholder="127.3xxxxx"></div>
+    <div class="row"><button class="sbtn go" id="bHere">지금 이 자리를 분수대로 저장</button></div>
+    <div class="row"><label>반경</label><input type="range" id="iRad" min="20" max="400" step="10"><span class="val" id="vRad"></span></div>
+  </div>
+
+  <div class="grp" id="gBrg" style="display:none">
+    <h3>방위 고정</h3>
+    <p class="hint">티박스에 서서 분수대를 화면 가운데에 놓고 “지금 방향 저장”을 누르세요. 나침반 앱으로 잰 각도를 직접 넣어도 됩니다.</p>
+    <div class="row"><label>방위각</label><input type="number" id="iBrg" min="0" max="359"><span class="val">°</span></div>
+    <div class="row"><button class="sbtn go" id="bGrab">지금 보는 방향 저장</button></div>
+    <div class="row"><label>허용 각도</label><input type="range" id="iTol" min="5" max="45" step="1"><span class="val" id="vTol"></span></div>
+  </div>
+
+  <div class="grp">
+    <h3>조준 보정</h3>
+    <p class="hint">수달이 분수대에서 옆으로 밀려 보이면, 분수대를 화면 정중앙에 놓고 보정하세요. 나침반 오차와 자기 편각이 한 번에 잡힙니다.</p>
+    <div class="row">
+      <button class="sbtn go" id="bCal">화면 중앙 = 분수대</button>
+      <button class="sbtn warn" id="bCalR">보정 초기화</button>
+    </div>
+    <div class="row"><label>미세 조정</label><input type="range" id="iOff" min="-45" max="45" step="0.5"><span class="val" id="vOff"></span></div>
+    <div class="row"><label>높이</label><input type="range" id="iH" min="-3" max="12" step="0.5"><span class="val" id="vH"></span></div>
+    <div class="row"><label>수달 크기</label><input type="range" id="iScale" min="0.5" max="4" step="0.1"><span class="val" id="vScale"></span></div>
+    <div class="row"><label>화각</label><input type="range" id="iFov" min="40" max="90" step="1"><span class="val" id="vFov"></span></div>
+  </div>
+
+  <div class="grp">
+    <h3>사진 로고</h3>
+    <p class="hint">촬영한 사진 오른쪽 아래에 로고와 리조트 이름이 얹힙니다. PNG 로고를 넣으면 그 로고를 씁니다.</p>
+    <div class="row"><label>표기 이름</label><input type="text" id="iName"></div>
+    <div class="row">
+      <button class="sbtn" id="bLogo">로고 이미지 넣기</button>
+      <button class="sbtn warn" id="bLogoR">로고 지우기</button>
+    </div>
+    <input type="file" id="fLogo" accept="image/*" hidden>
+  </div>
+
+  <div class="grp">
+    <h3>센서 상태</h3>
+    <div id="dbg">—</div>
+    <div class="row"><button class="sbtn" id="bClose">닫기</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="flash"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════
+   분수대 AR 수달 — 양지파인리조트
+   ─ 원리 ─
+   1) GPS로 사용자→분수대의 참방위각(true bearing)과 거리를 계산
+   2) 기기 자세(alpha/beta/gamma)로 회전행렬 R(기기→지구)을 만들고
+      그 전치로 목표 방향벡터를 '기기 좌표계'로 되돌린 뒤
+      핀홀 카메라 모델(f = (긴변/2)/tan(FOV/2))로 화면 픽셀에 투영
+      → 폰을 기울이거나 눕혀도 수달이 분수대에 붙어 있음
+   3) 자기편각·나침반 편차는 '화면 중앙=분수대' 1탭 보정으로 흡수
+   ═══════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+const cam = $('#cam'), cv = $('#ar'), ctx = cv.getContext('2d');
+
+/* ---------- 설정 ---------- */
+const DEF = { mode:'gps', lat:null, lng:null, radius:100, bearing:0, tol:18,
+              off:0, fov:65, height:1.6, scale:1.6, sound:true,
+              name:'양지파인리조트', logo:null };
+let S = Object.assign({}, DEF);
+try{ const raw = localStorage.getItem('otterAR.v1'); if(raw) S = Object.assign(S, JSON.parse(raw)); }catch(e){}
+const save = () => { try{ localStorage.setItem('otterAR.v1', JSON.stringify(S)); }catch(e){} };
+
+/* ---------- 상태 ---------- */
+const st = { lat:null, lng:null, acc:null, haveGeo:false, haveOri:false, absolute:false,
+             alpha:0, beta:90, gamma:0, dist:null, brg:null, camAz:0,
+             x:0, y:0, vis:false, sm:null, t0:performance.now(), line:'' };
+let logoImg = null;
+if(S.logo){ logoImg = new Image(); logoImg.src = S.logo; }
+
+/* ---------- 지구 계산 ---------- */
+function bearingTo(la1,lo1,la2,lo2){
+  const p1=la1*D2R, p2=la2*D2R, dl=(lo2-lo1)*D2R;
+  const y=Math.sin(dl)*Math.cos(p2);
+  const x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return (Math.atan2(y,x)*R2D+360)%360;
+}
+function distTo(la1,lo1,la2,lo2){
+  const R=6371000, p1=la1*D2R, p2=la2*D2R, dp=(la2-la1)*D2R, dl=(lo2-lo1)*D2R;
+  const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(a)));
+}
+
+/* ---------- 자세 → 회전행렬 (W3C: Z-X'-Y'') ---------- */
+function rot(alpha,beta,gamma){
+  const a=alpha*D2R,b=beta*D2R,g=gamma*D2R;
+  const cA=Math.cos(a),sA=Math.sin(a),cB=Math.cos(b),sB=Math.sin(b),cG=Math.cos(g),sG=Math.sin(g);
+  return [
+    [ cA*cG - sA*sB*sG, -sA*cB, cA*sG + sA*sB*cG ],
+    [ sA*cG + cA*sB*sG,  cA*cB, sA*sG - cA*sB*cG ],
+    [ -cB*sG,            sB,    cB*cG            ]
+  ];
+}
+/* 카메라(-Z축)가 가리키는 방위각 */
+function camAzimuth(R){
+  const fx=-R[0][2], fy=-R[1][2];
+  return (Math.atan2(fx,fy)*R2D+360)%360;
+}
+
+/* ---------- 센서 ---------- */
+function onOri(e){
+  if(e.alpha===null && e.webkitCompassHeading===undefined) return;
+  st.haveOri = true;
+  let alpha;
+  if(typeof e.webkitCompassHeading === 'number'){ alpha = (360 - e.webkitCompassHeading)%360; st.absolute = true; }
+  else { alpha = e.alpha || 0; if(e.absolute) st.absolute = true; }
+  st.alpha = alpha; st.beta = e.beta || 0; st.gamma = e.gamma || 0;
+}
+function startOri(){
+  if('ondeviceorientationabsolute' in window)
+    window.addEventListener('deviceorientationabsolute', onOri, true);
+  window.addEventListener('deviceorientation', onOri, true);
+}
+function startGeo(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(p=>{
+    st.haveGeo = true; st.acc = p.coords.accuracy;
+    // 저역통과: GPS 흔들림 억제
+    st.lat = st.lat===null ? p.coords.latitude  : st.lat + (p.coords.latitude  - st.lat)*0.35;
+    st.lng = st.lng===null ? p.coords.longitude : st.lng + (p.coords.longitude - st.lng)*0.35;
+  }, ()=>{}, {enableHighAccuracy:true, maximumAge:1000, timeout:20000});
+}
+
+/* ---------- 오디오(파일 없이 합성) ---------- */
+let AC=null;
+const audioOn = () => { if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume(); };
+function chirp(){ // 수달 울음
+  if(!S.sound||!AC) return; const t=AC.currentTime;
+  [1,1.5].forEach((m,i)=>{
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=i?'triangle':'sine';
+    o.frequency.setValueAtTime(900*m,t); o.frequency.exponentialRampToValueAtTime(1750*m,t+.07);
+    o.frequency.exponentialRampToValueAtTime(1150*m,t+.19);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(i?.05:.13,t+.02);
+    g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t+.25);
+  });
+}
+function splash(){ // 물 첨벙
+  if(!S.sound||!AC) return; const t=AC.currentTime, n=Math.floor(AC.sampleRate*.4);
+  const buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.2);
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.1;
+  bp.frequency.setValueAtTime(2600,t); bp.frequency.exponentialRampToValueAtTime(420,t+.34);
+  const g=AC.createGain(); g.gain.setValueAtTime(.25,t); g.gain.exponentialRampToValueAtTime(.001,t+.38);
+  src.connect(bp).connect(g).connect(AC.destination); src.start(t);
+}
+
+/* ---------- 캔버스 ---------- */
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2.5);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize,250));
+
+/* ---------- 수달 그리기 ---------- */
+const LINES = ['여기 물, 참 맑죠?','오늘 스코어는 좀 어때요?','한 컷 찍고 가세요','슬라이스 조심하세요','저 여기 삽니다'];
+const CYCLE = 4600; // ms
+let lastPhase = 9, lineIdx = 0;
+
+function drawOtter(g, cx, cy, s, ph){
+  // ph 0~1 : 0 잔물결 → 등장 → 미소 → 잠수 → 물보라
+  let rise = 0, dive = 0;
+  if(ph < .12){ rise = 0; }
+  else if(ph < .34){ const k=(ph-.12)/.22; rise = 1-Math.pow(1-k,3); }
+  else if(ph < .74){ rise = 1; }
+  else if(ph < .86){ const k=(ph-.74)/.12; rise = 1-k*k; dive = k; }
+  const waterY = cy + s*0.52;
+
+  // 물결
+  g.save();
+  const rw = 1 + (ph<.12 ? ph/.12 : (ph>.86 ? (ph-.86)/.14 : .35));
+  for(let i=0;i<3;i++){
+    const k = (rw + i*.33) % 1.4;
+    g.globalAlpha = Math.max(0,(1-k/1.4))*0.5;
+    g.strokeStyle = '#bfe6ef'; g.lineWidth = Math.max(1, s*0.035);
+    g.beginPath(); g.ellipse(cx, waterY, s*(0.35+k*0.62), s*(0.11+k*0.2), 0, 0, Math.PI*2); g.stroke();
+  }
+  g.restore();
+
+  if(rise <= 0.001){ return; }
+
+  const y = cy + (1-rise)*s*1.25;
+  const bob = Math.sin(ph*Math.PI*2*3)*s*0.014*rise;
+  const tilt = Math.sin(ph*Math.PI*2*1.5)*0.05*rise;
+
+  g.save();
+  g.beginPath(); g.rect(0,0,W,waterY); g.clip();      // 수면 위만 보이게
+  g.translate(cx, y+bob); g.rotate(tilt);
+
+  const FUR='#a3764e', FUR_D='#8a6340', BELLY='#f0ddc2', DARK='#241a10';
+  // 몸통
+  g.fillStyle=FUR; g.beginPath(); g.ellipse(0, s*0.46, s*0.40, s*0.44, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle=BELLY; g.beginPath(); g.ellipse(0, s*0.52, s*0.27, s*0.33, 0, 0, Math.PI*2); g.fill();
+  // 앞발 + 골프공
+  g.fillStyle=FUR_D;
+  g.beginPath(); g.ellipse(-s*0.20, s*0.44, s*0.11, s*0.09, .4, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse( s*0.20, s*0.44, s*0.11, s*0.09,-.4, 0, Math.PI*2); g.fill();
+  g.fillStyle='#fff'; g.beginPath(); g.arc(0, s*0.45, s*0.105, 0, Math.PI*2); g.fill();
+  g.fillStyle='rgba(0,0,0,.10)';
+  for(let i=0;i<5;i++){ const a=i*1.25; g.beginPath(); g.arc(Math.cos(a)*s*.04, s*0.45+Math.sin(a)*s*.04, s*.016,0,Math.PI*2); g.fill(); }
+  // 귀
+  g.fillStyle=FUR_D;
+  g.beginPath(); g.arc(-s*0.31,-s*0.26, s*0.105, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.arc( s*0.31,-s*0.26, s*0.105, 0, Math.PI*2); g.fill();
+  g.fillStyle='#c79a72';
+  g.beginPath(); g.arc(-s*0.31,-s*0.26, s*0.052, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.arc( s*0.31,-s*0.26, s*0.052, 0, Math.PI*2); g.fill();
+  // 머리
+  g.fillStyle=FUR; g.beginPath(); g.ellipse(0,-s*0.05, s*0.40, s*0.38, 0, 0, Math.PI*2); g.fill();
+  // 주둥이
+  g.fillStyle=BELLY; g.beginPath(); g.ellipse(0, s*0.08, s*0.24, s*0.18, 0, 0, Math.PI*2); g.fill();
+  // 눈 (등장 직후 한 번 깜빡)
+  const blink = (ph>.40&&ph<.45)||(ph>.60&&ph<.635);
+  g.fillStyle=DARK;
+  [-1,1].forEach(d=>{
+    if(blink){ g.save(); g.lineWidth=s*0.035; g.strokeStyle=DARK; g.lineCap='round';
+      g.beginPath(); g.moveTo(d*s*0.17-s*0.05,-s*0.09); g.quadraticCurveTo(d*s*0.17,-s*0.05, d*s*0.17+s*0.05,-s*0.09); g.stroke(); g.restore(); }
+    else{
+      g.beginPath(); g.ellipse(d*s*0.17,-s*0.10, s*0.072, s*0.082, 0,0,Math.PI*2); g.fill();
+      g.save(); g.fillStyle='#fff';
+      g.beginPath(); g.arc(d*s*0.17+s*0.026,-s*0.13, s*0.026,0,Math.PI*2); g.fill(); g.restore();
+    }
+  });
+  // 볼터치
+  g.fillStyle='rgba(232,140,120,.38)';
+  g.beginPath(); g.ellipse(-s*0.29, s*0.04, s*0.072, s*0.048,0,0,Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse( s*0.29, s*0.04, s*0.072, s*0.048,0,0,Math.PI*2); g.fill();
+  // 코 + 미소
+  g.fillStyle='#43301f';
+  g.beginPath(); g.ellipse(0, s*0.02, s*0.055, s*0.040, 0,0,Math.PI*2); g.fill();
+  const smile = Math.min(1, Math.max(0,(ph-.34)/.14));
+  g.strokeStyle='#5c422a'; g.lineWidth=s*0.032; g.lineCap='round';
+  g.beginPath(); g.moveTo(-s*0.10, s*0.075);
+  g.quadraticCurveTo(0, s*0.075 + s*0.085*smile, s*0.10, s*0.075); g.stroke();
+  // 수염
+  g.strokeStyle='rgba(255,255,255,.72)'; g.lineWidth=s*0.014;
+  [-1,1].forEach(d=>{ for(let i=0;i<3;i++){
+    g.beginPath(); g.moveTo(d*s*0.13, s*0.02+i*s*0.035);
+    g.quadraticCurveTo(d*s*0.30, s*(0.0+i*0.035), d*s*0.44, s*(-0.02+i*0.055)); g.stroke(); }});
+  g.restore();
+
+  // 물보라
+  if(dive>0){
+    g.save(); g.fillStyle='rgba(200,236,245,.85)';
+    for(let i=0;i<9;i++){
+      const a=-Math.PI*0.15-Math.PI*0.7*(i/8), sp=s*(0.5+((i*37)%10)/12);
+      g.globalAlpha=(1-dive)*0.9;
+      g.beginPath(); g.arc(cx+Math.cos(a)*sp*dive*1.7, waterY+Math.sin(a)*sp*dive*1.7 + dive*dive*s*0.5, s*0.035,0,Math.PI*2); g.fill();
+    }
+    g.restore();
+  }
+
+  // 말풍선
+  if(ph>.40 && ph<.70){
+    const a = Math.min(1,(ph-.40)/.06) * Math.min(1,(.70-ph)/.06);
+    const txt = LINES[lineIdx % LINES.length];
+    g.save(); g.globalAlpha = a;
+    g.font = `700 ${Math.max(12, s*0.145)}px -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif`;
+    const tw = g.measureText(txt).width, pw = tw+s*0.30, phh = s*0.36;
+    const bx = cx - pw/2, by = y + bob - s*0.55 - phh;
+    g.fillStyle='rgba(255,255,255,.95)';
+    if(g.roundRect){ g.beginPath(); g.roundRect(bx,by,pw,phh,phh/2); g.fill(); }
+    else { g.fillRect(bx,by,pw,phh); }
+    g.beginPath(); g.moveTo(cx-s*0.07,by+phh-1); g.lineTo(cx,by+phh+s*0.11); g.lineTo(cx+s*0.07,by+phh-1); g.fill();
+    g.fillStyle='#14231d'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(txt, cx, by+phh/2+s*0.008);
+    g.restore();
+  }
+}
+
+/* ---------- 메인 루프 ---------- */
+const arrow = $('#arrow'), msgEl = $('#msg');
+function loop(){
+  requestAnimationFrame(loop);
+  ctx.clearRect(0,0,W,H);
+
+  const R = rot(st.alpha, st.beta, st.gamma);
+  st.camAz = camAzimuth(R);
+
+  // 목표 방위 / 거리
+  let brg=null, dist=null, inRange=false;
+  if(S.mode==='gps' && S.lat!==null && st.lat!==null){
+    brg  = bearingTo(st.lat, st.lng, S.lat, S.lng);
+    dist = distTo(st.lat, st.lng, S.lat, S.lng);
+    inRange = dist <= S.radius;
+  } else if(S.mode==='bearing'){
+    brg = S.bearing; dist = 55; inRange = true;
+  }
+  st.brg = brg; st.dist = dist;
+
+  let show=false, px=0, py=0, size=120, off=0;
+  if(brg!==null && st.haveOri){
+    const bAdj = ((brg - S.off)%360+360)%360;           // 센서 좌표계 기준 방위
+    const elev = Math.atan2(S.height, Math.max(6, dist||55));
+    const ce = Math.cos(elev);
+    const t = [ Math.sin(bAdj*D2R)*ce, Math.cos(bAdj*D2R)*ce, Math.sin(elev) ]; // E,N,U
+    // 기기 좌표계로 역변환 (Rᵀ·t)
+    let dx = R[0][0]*t[0] + R[1][0]*t[1] + R[2][0]*t[2];
+    let dy = R[0][1]*t[0] + R[1][1]*t[1] + R[2][1]*t[2];
+    let dz = R[0][2]*t[0] + R[1][2]*t[1] + R[2][2]*t[2];
+    // 흔들림 완화
+    if(!st.sm) st.sm=[dx,dy,dz];
+    st.sm[0]+= (dx-st.sm[0])*0.22; st.sm[1]+= (dy-st.sm[1])*0.22; st.sm[2]+= (dz-st.sm[2])*0.22;
+    [dx,dy,dz]=st.sm;
+
+    const depth = -dz;                                   // 카메라 전방 = -Z
+    const f = (Math.max(W,H)/2) / Math.tan(S.fov*D2R/2);
+    let u = dx/Math.max(1e-4, depth), v = dy/Math.max(1e-4, depth);
+    const ang = ((screen.orientation && screen.orientation.angle) || window.orientation || 0)*D2R;
+    const u2 = u*Math.cos(ang) + v*Math.sin(ang);
+    const v2 = -u*Math.sin(ang) + v*Math.cos(ang);
+    px = W/2 + u2*f; py = H/2 - v2*f;
+
+    // 물리 크기 + 가시성 배율
+    size = Math.min(Math.max(f*1.3/Math.max(8,dist||55) * S.scale * 3.2, 84), Math.min(W,H)*0.55);
+
+    // 각도차 (방위 고정 모드의 허용 범위 판정용)
+    off = Math.abs(((st.camAz - brg + 540)%360)-180);
+    const angleOK = (S.mode!=='bearing') || off <= S.tol;
+    show = depth>0.08 && inRange && angleOK && px>-size && px<W+size && py>-size && py<H+size;
+
+    // 방향 화살표
+    const needGuide = inRange && (!show) && (S.mode!=='bearing' || off>S.tol);
+    if(needGuide){
+      const edge = 62;
+      let gx = Math.min(Math.max(px, edge), W-edge), gy = Math.min(Math.max(py, edge), H-edge);
+      if(depth<=0.08){ gy = H/2; gx = (u2>=0? W-edge : edge); }
+      arrow.style.left = gx+'px'; arrow.style.top = gy+'px'; arrow.style.opacity = .95;
+      arrow.style.transform = 'rotate('+(Math.atan2(py-gy, px-gx)*R2D+90)+'deg)';
+    } else arrow.style.opacity = 0;
+  } else arrow.style.opacity = 0;
+
+  // 애니메이션
+  if(show){
+    const ph = ((performance.now()-st.t0)%CYCLE)/CYCLE;
+    const pIdx = ph<.12?0 : ph<.34?1 : ph<.74?2 : ph<.86?3 : 4;
+    if(pIdx!==lastPhase){
+      if(pIdx===1) chirp();
+      if(pIdx===3) splash();
+      if(pIdx===0) lineIdx++;
+      lastPhase = pIdx;
+    }
+    drawOtter(ctx, px, py, size, ph);
+  } else { st.t0 = performance.now(); lastPhase = 9; }
+  st.vis = show;
+
+  // 안내 문구
+  let m='';
+  if(!st.haveOri) m='휴대폰을 세워서 천천히 8자로 돌려 나침반을 깨워주세요';
+  else if(S.mode==='gps' && S.lat===null) m='설정에서 분수대 위치를 먼저 저장해 주세요';
+  else if(S.mode==='gps' && !st.haveGeo) m='위치를 찾는 중입니다';
+  else if(dist!==null && !inRange) m='분수대까지 약 '+Math.round(dist)+'m — '+S.radius+'m 안으로 들어오면 수달이 나타납니다';
+  else if(!show) m='분수대 쪽으로 천천히 돌려보세요';
+  if(m!==st.line){ msgEl.textContent=m; msgEl.style.opacity = m?1:0; st.line=m; }
+
+  // 상단 칩
+  $('#cDist').textContent = (S.mode==='bearing') ? ('허용 ±'+S.tol+'°')
+      : (dist===null ? '거리 —' : (dist<1000? Math.round(dist)+'m' : (dist/1000).toFixed(1)+'km'));
+  $('#cHead').textContent = '방위 '+Math.round(st.camAz)+'°'+(brg!==null? ' / 목표 '+Math.round(brg)+'°':'');
+
+  if(sheetOpen) $('#dbg').textContent =
+    '나침반 '+(st.haveOri?(st.absolute?'절대값 정상':'상대값 — 보정 필요'):'없음')+'\n'+
+    '현재 방위 '+st.camAz.toFixed(1)+'°  |  목표 '+(brg===null?'—':brg.toFixed(1)+'°')+'  |  차이 '+(brg===null?'—':off.toFixed(1)+'°')+'\n'+
+    'GPS '+(st.haveGeo? st.lat.toFixed(6)+', '+st.lng.toFixed(6)+' (±'+Math.round(st.acc)+'m)':'수신 중')+'\n'+
+    '거리 '+(dist===null?'—':Math.round(dist)+'m')+'  |  보정 '+S.off.toFixed(1)+'°  |  화각 '+S.fov+'°\n'+
+    'β '+st.beta.toFixed(0)+'°  γ '+st.gamma.toFixed(0)+'°  |  수달 '+(show?'표시 중':'대기');
+}
+
+/* ---------- 사진 ---------- */
+function watermark(g,w,h){
+  const pad = Math.round(Math.min(w,h)*0.035);
+  const fs  = Math.round(Math.min(w,h)*0.032);
+  g.font = `700 ${fs}px -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif`;
+  const tw = g.measureText(S.name).width;
+  const lw = logoImg && logoImg.complete ? fs*1.5 : 0;
+  const bw = tw + lw + (lw?fs*0.5:0) + fs*1.2, bh = fs*2;
+  const bx = w-pad-bw, by = h-pad-bh;
+  g.save(); g.globalAlpha=.82; g.fillStyle='rgba(8,18,15,.55)';
+  if(g.roundRect){ g.beginPath(); g.roundRect(bx,by,bw,bh,bh/2); g.fill(); } else g.fillRect(bx,by,bw,bh);
+  g.globalAlpha=1;
+  let tx = bx+fs*0.6;
+  if(lw){ g.drawImage(logoImg, tx, by+(bh-lw)/2, lw, lw); tx += lw+fs*0.5; }
+  g.fillStyle='#fff'; g.textBaseline='middle'; g.textAlign='left';
+  g.fillText(S.name, tx, by+bh/2+1);
+  g.restore();
+}
+async function shoot(){
+  if(!cam.videoWidth){ toast('카메라가 아직 준비되지 않았습니다'); return; }
+  const c=document.createElement('canvas'); c.width=cv.width; c.height=cv.height;
+  const g=c.getContext('2d');
+  const vw=cam.videoWidth, vh=cam.videoHeight;
+  const sc=Math.max(c.width/vw, c.height/vh);
+  g.drawImage(cam, (c.width-vw*sc)/2, (c.height-vh*sc)/2, vw*sc, vh*sc);
+  g.drawImage(cv, 0, 0);
+  watermark(g, c.width, c.height);
+  $('#flash').style.opacity=.85; setTimeout(()=>$('#flash').style.opacity=0, 90);
+  const blob = await new Promise(r=>c.toBlob(r,'image/jpeg',.92));
+  const file = new File([blob], 'otter-'+Date.now()+'.jpg', {type:'image/jpeg'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], text:'분수대에서 만난 수달 🦦 #'+S.name}); return; }catch(e){}
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=file.name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast('사진을 저장했습니다');
+}
+
+/* ---------- UI ---------- */
+let sheetOpen=false;
+const sheet=$('#sheet');
+const openSheet = v => { sheetOpen=v; sheet.classList.toggle('open', v); };
+let tt;
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('on'),1900); }
+
+function syncUI(){
+  $('#iLat').value = S.lat ?? ''; $('#iLng').value = S.lng ?? '';
+  $('#iRad').value = S.radius; $('#vRad').textContent = S.radius+'m';
+  $('#iBrg').value = Math.round(S.bearing);
+  $('#iTol').value = S.tol; $('#vTol').textContent = '±'+S.tol+'°';
+  $('#iOff').value = S.off; $('#vOff').textContent = S.off.toFixed(1)+'°';
+  $('#iH').value = S.height; $('#vH').textContent = S.height.toFixed(1)+'m';
+  $('#iScale').value = S.scale; $('#vScale').textContent = S.scale.toFixed(1)+'배';
+  $('#iFov').value = S.fov; $('#vFov').textContent = S.fov+'°';
+  $('#iName').value = S.name;
+  $('#gGps').style.display = S.mode==='gps' ? '' : 'none';
+  $('#gBrg').style.display = S.mode==='bearing' ? '' : 'none';
+  document.querySelectorAll('#segMode button').forEach(b=>b.classList.toggle('on', b.dataset.m===S.mode));
+  $('#bSound').textContent = S.sound ? '🔊' : '🔇';
+}
+const bind=(sel,ev,fn)=>$(sel).addEventListener(ev,fn);
+
+bind('#cGear','click',()=>openSheet(true));
+bind('#bClose','click',()=>openSheet(false));
+bind('#bSound','click',()=>{ S.sound=!S.sound; save(); syncUI(); toast(S.sound?'소리 켜짐':'소리 꺼짐'); });
+bind('#bShot','click',shoot);
+bind('#bAim','click',()=>{ calibrate(); });
+
+document.querySelectorAll('#segMode button').forEach(b=>b.addEventListener('click',()=>{
+  S.mode=b.dataset.m; save(); syncUI();
+}));
+bind('#iLat','change',e=>{ const v=parseFloat(e.target.value); S.lat=isNaN(v)?null:v; save(); });
+bind('#iLng','change',e=>{ const v=parseFloat(e.target.value); S.lng=isNaN(v)?null:v; save(); });
+bind('#iRad','input',e=>{ S.radius=+e.target.value; $('#vRad').textContent=S.radius+'m'; save(); });
+bind('#iBrg','change',e=>{ S.bearing=(+e.target.value+360)%360; save(); });
+bind('#iTol','input',e=>{ S.tol=+e.target.value; $('#vTol').textContent='±'+S.tol+'°'; save(); });
+bind('#iOff','input',e=>{ S.off=+e.target.value; $('#vOff').textContent=S.off.toFixed(1)+'°'; save(); });
+bind('#iH','input',e=>{ S.height=+e.target.value; $('#vH').textContent=S.height.toFixed(1)+'m'; save(); });
+bind('#iScale','input',e=>{ S.scale=+e.target.value; $('#vScale').textContent=S.scale.toFixed(1)+'배'; save(); });
+bind('#iFov','input',e=>{ S.fov=+e.target.value; $('#vFov').textContent=S.fov+'°'; save(); });
+bind('#iName','change',e=>{ S.name=e.target.value||'양지파인리조트'; save(); });
+
+bind('#bHere','click',()=>{
+  if(!navigator.geolocation){ toast('위치 기능을 쓸 수 없습니다'); return; }
+  toast('위치 확인 중…');
+  navigator.geolocation.getCurrentPosition(p=>{
+    S.lat=+p.coords.latitude.toFixed(7); S.lng=+p.coords.longitude.toFixed(7); save(); syncUI();
+    toast('분수대 위치를 저장했습니다 (±'+Math.round(p.coords.accuracy)+'m)');
+  },()=>toast('위치를 받지 못했습니다'),{enableHighAccuracy:true,timeout:15000});
+});
+bind('#bGrab','click',()=>{
+  if(!st.haveOri){ toast('나침반이 아직 준비되지 않았습니다'); return; }
+  S.bearing = Math.round(((st.camAz + S.off)%360+360)%360); save(); syncUI();
+  toast('방위 '+S.bearing+'°로 저장했습니다');
+});
+function calibrate(){
+  if(!st.haveOri){ toast('나침반이 아직 준비되지 않았습니다'); return; }
+  if(st.brg===null){ toast('먼저 분수대 위치나 방위를 저장하세요'); return; }
+  if(S.mode==='bearing'){ S.off = 0; S.bearing = Math.round(st.camAz); }
+  else { let d = st.brg - st.camAz; d = ((d+540)%360)-180; S.off = +d.toFixed(1); }
+  save(); syncUI(); toast('화면 중앙을 분수대로 맞췄습니다');
+}
+bind('#bCal','click',calibrate);
+bind('#bCalR','click',()=>{ S.off=0; save(); syncUI(); toast('보정을 초기화했습니다'); });
+bind('#bLogo','click',()=>$('#fLogo').click());
+bind('#fLogo','change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const im=new Image();
+    im.onload=()=>{ const c=document.createElement('canvas'); const m=256;
+      const k=Math.min(m/im.width,m/im.height,1); c.width=im.width*k; c.height=im.height*k;
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      S.logo=c.toDataURL('image/png'); save(); logoImg=new Image(); logoImg.src=S.logo; toast('로고를 저장했습니다'); };
+    im.src=r.result; };
+  r.readAsDataURL(f);
+});
+bind('#bLogoR','click',()=>{ S.logo=null; logoImg=null; save(); toast('로고를 지웠습니다'); });
+
+/* ---------- 시작 ---------- */
+async function boot(openSetup){
+  audioOn();
+  if(typeof DeviceOrientationEvent!=='undefined' && DeviceOrientationEvent.requestPermission){
+    try{ await DeviceOrientationEvent.requestPermission(); }catch(e){}
+  }
+  startOri(); startGeo();
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }, audio:false });
+    cam.srcObject = stream; await cam.play();
+  }catch(e){ toast('카메라를 열지 못했습니다. 권한을 확인해 주세요'); }
+  $('#gate').style.display='none';
+  resize(); syncUI();
+  if(openSetup) openSheet(true);
+}
+bind('#bStart','click',()=>boot(false));
+bind('#bSetup','click',()=>boot(true));
+
+resize(); syncUI(); loop();
+</script>
+</body>
+</html>
